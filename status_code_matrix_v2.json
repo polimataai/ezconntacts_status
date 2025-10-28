@@ -12,7 +12,7 @@
     "FEDEX": "https://www.fedex.com/fedextrack/?tracknumbers={tn}",
     "UPS": "https://www.ups.com/track?tracknum={tn}",
     "DHL": "https://www.dhl.com/us-en/home/tracking.html?tracking-id={tn}&submit=1",
-    "DHLE": "https://www.dhl.com/us-en/home/tracking.html?tracking-id={tn}&submit=1",
+    "DHLe": "https://www.dhl.com/us-en/home/tracking.html?tracking-id={tn}&submit=1",
     "AMAZON": "https://track.amazon.com/tracking/{tn}?trackingId={tn}",
     "default": "https://www.aftership.com/track/{tn}"
   },
