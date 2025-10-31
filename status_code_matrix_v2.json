@@ -1,6 +1,6 @@
 {
-  "version": "2.0",
-  "updated_at": "2025-10-08T17:51:17Z",
+  "version": "2.1",
+  "updated_at": "2025-10-30T00:00:00Z",
   "template_syntax": "simple_if_blocks",
   "category_noun_map": {
     "frames": "frame",
@@ -27,714 +27,299 @@
     "Exchanged",
     "Canceled"
   ],
+
+  "context_fields": [
+    "code",
+    "bucket",
+    "category",
+    "status_updated",
+    "status_age_business_days",
+    "qty_available",
+    "is_rx",
+    "is_outsourced",
+    "is_payment_due",
+    "is_manual_hold",
+    "tracking_carrier",
+    "tracking_number",
+    "canceled_date",
+    "reason"
+  ],
+
+  "global_rules": [
+    {
+      "when": { "is_manual_hold": true },
+      "response": "Your order is temporarily on hold. Once the hold is lifted, we’ll continue processing and share an updated ETA."
+    },
+    {
+      "when": { "is_payment_due": true },
+      "response": "We’re waiting to process payment. As soon as it’s confirmed, we’ll resume processing and share an updated ETA."
+    }
+  ],
+
+  "eta_matrices": {
+    "frames": [
+      { "when": { "status_age_business_days": "<=3" }, "response": "Estimated availability: up to 3 business days from the last update. We’ll notify you as soon as it’s ready to ship." },
+      { "when": { "status_age_business_days": ">=4", "status_age_business_days_max": 8 }, "response": "Estimated availability: up to 8 business days from the last update. We’ll notify you as soon as it’s ready to ship." },
+      { "when": { "status_age_business_days": ">=9", "status_age_business_days_max": 15 }, "response": "Estimated availability: up to 15 business days from the last update. We’ll notify you as soon as it’s ready to ship." },
+      { "when": { "status_age_business_days": ">15" }, "response": "We’re sorry for the delay. It’s taking longer than expected. We can suggest alternative in-stock options or keep monitoring this item—please let us know your preference." }
+    ],
+    "contacts": [
+      { "when": { "status_age_business_days": "<=3" }, "response": "Estimated ship date: {{status_updated}} + 3 business days. We’ll email tracking once it ships." },
+      { "when": { "status_age_business_days": ">=4", "status_age_business_days_max": 8 }, "response": "Estimated ship date: {{status_updated}} + 8 business days. We’ll email tracking once it ships." },
+      { "when": { "status_age_business_days": ">=9", "status_age_business_days_max": 15 }, "response": "Estimated ship date: {{status_updated}} + 15 business days. We’ll email tracking once it ships." },
+      { "when": { "status_age_business_days": ">15" }, "response": "It can ship any day based on supplier updates. We’ll email tracking as soon as it ships." }
+    ]
+  },
+
   "buckets": {
     "Pending Verification": {
-      "thresholds": {
-        "delay_days": 3
-      },
+      "thresholds": { "delay_days": 3 },
       "time_scope": "Typical 0–2 business days; investigate if ≥3 business days.",
       "responses": {
         "normal": "Your prescription is being verified. Once approved, we’ll prepare your order for shipment.",
         "delayed": "We apologize for the delay. Your prescription is still being verified. Once approved, we’ll prepare your order for shipment."
       },
+      "named_responses": {
+        "processing_msg": "Your prescription is being verified. Once approved, we’ll begin processing your order."
+      },
+      "rules": [
+        { "when": { "qty_available": "<0" }, "use": "processing_msg" },
+        { "when": { "status_age_business_days": ">=3" }, "use": "delayed" },
+        { "when": "otherwise", "use": "normal" }
+      ],
       "placeholders_required": []
     },
+
     "Verification Approved": {
-      "thresholds": {
-        "delay_days": 3
-      },
+      "thresholds": { "delay_days": 3 },
       "time_scope": "Ship prep 0–2 business days; investigate if ≥3.",
       "responses": {
         "normal": "Your prescription has been verified. We are preparing your order for shipment.",
         "delayed": "We apologize for the delay. Your prescription is verified and we are preparing your order for shipment."
       },
+      "named_responses": {
+        "processing_msg": "Your prescription has been verified and we have begun processing your order."
+      },
+      "rules": [
+        { "when": { "qty_available": "<0" }, "use": "processing_msg" },
+        { "when": { "status_age_business_days": ">=3" }, "use": "delayed" },
+        { "when": "otherwise", "use": "normal" }
+      ],
       "placeholders_required": []
     },
-    "Awaiting Restock": {
-      "thresholds": {
-        "checkin_days": 3
-      },
-      "time_scope": "Varies by supplier; provide ETA; update customer every 3–5 business days.",
-      "responses": {
-        "single": "This {{noun}} is temporarily out of stock. We’ll notify you as soon as it’s available."
-      },
-      "placeholders_required": [
-        "noun"
-      ]
-    },
+
     "Processing at Lab": {
-      "thresholds": {
-        "delay_days": 7,
-        "escalate_days": 14
-      },
+      "thresholds": { "delay_days": 7, "escalate_days": 14 },
       "time_scope": "Lenses usually 3–5 business days; check at ≥7; escalate at ≥14.",
       "responses": {
         "normal": "Your prescription lenses are being processed at our lab. Estimated completion within 3–5 business days.",
         "delayed": "We apologize for the delay. Your lenses are still being processed at our lab.",
         "escalated": "This is taking longer than expected. We’ve escalated your order for manual review."
       },
+      "named_responses": {
+        "eta_not_outsourced": "Your prescription lenses are being processed at our lab and should be ready within ~3 business days from the last update. We’ll notify you via email.",
+        "eta_outsourced": "Your prescription lenses are being processed at our lab and should be ready within ~5 business days from the last update. We’ll notify you via email."
+      },
+      "rules": [
+        { "when": { "status_age_business_days": ">=14" }, "use": "escalated" },
+        { "when": { "status_age_business_days": ">=7", "is_outsourced": false }, "use": "delayed" },
+        { "when": { "status_age_business_days": ">=7", "is_outsourced": true }, "response": "We apologize for the delay. Your prescription lenses are being processed at our lab and should be ready within ~10 business days from the last update. We’ll notify you via email." },
+        { "when": { "is_outsourced": true }, "use": "eta_outsourced" },
+        { "when": "otherwise", "use": "eta_not_outsourced" }
+      ],
       "placeholders_required": []
     },
+
     "Processing": {
-      "thresholds": {
-        "delay_days": 7
-      },
+      "thresholds": { "delay_days": 7 },
       "time_scope": "Fulfillment typically 1–7 business days; investigate if ≥7.",
       "responses": {
         "normal": "Your order is being fulfilled. You’ll receive tracking information once it ships.",
         "delayed": "We’re still preparing your order. Thanks for your patience while we finalize shipment."
       },
+      "rules": [
+        { "when": { "code": 470, "is_rx": true }, "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be completed." },
+        { "when": { "code": 420 }, "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be complete." },
+        { "when": { "code": 430 }, "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information." },
+        { "when": { "code": 460 }, "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information." },
+        { "when": { "code": 463 }, "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information." },
+        { "when": { "status_age_business_days": ">=7" }, "use": "delayed" },
+        { "when": "otherwise", "use": "normal" }
+      ],
       "placeholders_required": [],
       "special_cases": {
         "470": {
-          "applies_if": {
-            "is_rx": true
-          },
-          "response": {
-            "single": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be completed."
-          },
+          "applies_if": { "is_rx": true },
+          "response": { "single": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be completed." },
           "placeholders_required": []
         },
         "410": {
-          "response": {
-            "single": "Your order is being prepared for shipment. You’ll receive tracking information once it ships."
-          },
+          "response": { "single": "Your order is being prepared for shipment. You’ll receive tracking information once it ships." },
           "placeholders_required": []
         },
         "600": {
-          "response": {
-            "single": "Your order is being prepared for shipment. You’ll receive tracking information once it ships."
-          },
+          "response": { "single": "Your order is being prepared for shipment. You’ll receive tracking information once it ships." },
           "placeholders_required": []
         }
       }
     },
+
+    "Awaiting Restock": {
+      "thresholds": { "checkin_days": 3 },
+      "time_scope": "Varies by supplier; provide ETA; update customer every 3–5 business days.",
+      "responses": {
+        "single": "This {{noun}} is temporarily out of stock. We’ll notify you as soon as it’s available."
+      },
+      "rules": [
+        { "when": { "category": "frames" }, "matrix": "frames" },
+        { "when": { "category": "contacts" }, "matrix": "contacts" },
+        { "when": "otherwise", "use": "single" }
+      ],
+      "placeholders_required": [ "noun" ]
+    },
+
     "Shipped": {
       "thresholds": {},
       "time_scope": "Carrier transit times apply; share tracking link.",
       "responses": {
         "single": "Your order has shipped! {{if tracking_link}}Track it here: {{tracking_link}}{{/if}}{{if no_tracking}}Tracking will be available soon.{{/if}}"
       },
-      "placeholders_required": [
-        "tracking_link"
-      ]
+      "rules": [
+        {
+          "when": { "tracking_carrier": "ANY", "tracking_number": "ANY" },
+          "response": "Your order has shipped! {{if tracking_link}}Track it here: {{tracking_link}}{{/if}}{{if no_tracking}}Tracking will be available soon.{{/if}}"
+        }
+      ],
+      "placeholders_required": [ "tracking_link" ]
     },
+
     "Canceled": {
       "thresholds": {},
       "time_scope": "Refund (if applicable) appears in 3–5 business days.",
       "responses": {
         "single": "This item was canceled{{if canceled_date}} on {{canceled_date}}{{/if}}{{if reason}} ({{reason}}){{/if}}. Refunds (if applicable) are processed by your card issuer/bank within 3–5 business days."
       },
-      "placeholders_required": [
-        "canceled_date",
-        "reason"
-      ]
+      "rules": [
+        { "when": "otherwise", "use": "single" }
+      ],
+      "placeholders_required": [ "canceled_date", "reason" ]
     },
+
     "Returned": {
       "thresholds": {},
       "time_scope": "Process refund/replacement in ~3–5 business days after receipt.",
-      "responses": {
-        "single": "We’ve received your return. Refunds or replacements are being processed."
-      },
+      "responses": { "single": "We’ve received your return. Refunds or replacements are being processed." },
+      "rules": [ { "when": "otherwise", "use": "single" } ],
       "placeholders_required": []
     },
+
     "Exchanged": {
       "thresholds": {},
       "time_scope": "Replacement processing ~1–3 business days after approval/receipt.",
-      "responses": {
-        "single": "Your exchange has been logged. We’ll process the replacement shortly."
-      },
+      "responses": { "single": "Your exchange has been logged. We’ll process the replacement shortly." },
+      "rules": [ { "when": "otherwise", "use": "single" } ],
       "placeholders_required": []
     }
   },
+
   "codes": {
-    "240": {
-      "code": 240,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "241": {
-      "code": 241,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "242": {
-      "code": 242,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "244": {
-      "code": 244,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "245": {
-      "code": 245,
-      "bucket": "Verification Approved",
-      "category": "item",
-      "description": ""
-    },
-    "246": {
-      "code": 246,
-      "bucket": "Awaiting Restock",
-      "category": "item",
-      "description": ""
-    },
-    "250": {
-      "code": 250,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "252": {
-      "code": 252,
-      "bucket": "Verification Approved",
-      "category": "item",
-      "description": ""
-    },
-    "254": {
-      "code": 254,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "255": {
-      "code": 255,
-      "bucket": "Awaiting Restock",
-      "category": "item",
-      "description": ""
-    },
-    "260": {
-      "code": 260,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "261": {
-      "code": 261,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "262": {
-      "code": 262,
-      "bucket": "Verification Approved",
-      "category": "item",
-      "description": ""
-    },
-    "264": {
-      "code": 264,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "265": {
-      "code": 265,
-      "bucket": "Awaiting Restock",
-      "category": "item",
-      "description": ""
-    },
-    "266": {
-      "code": 266,
-      "bucket": "Pending Verification",
-      "category": "item",
-      "description": ""
-    },
-    "270": {
-      "code": 270,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "272": {
-      "code": 272,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "273": {
-      "code": 273,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "274": {
-      "code": 274,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "276": {
-      "code": 276,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "278": {
-      "code": 278,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "280": {
-      "code": 280,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "282": {
-      "code": 282,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "295": {
-      "code": 295,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "297": {
-      "code": 297,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "299": {
-      "code": 299,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "312": {
-      "code": 312,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "313": {
-      "code": 313,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "320": {
-      "code": 320,
-      "bucket": "Processing at Lab",
-      "category": "item",
-      "description": ""
-    },
-    "380": {
-      "code": 380,
-      "bucket": "Processing at Lab",
-      "category": "frames",
-      "description": ""
-    },
-    "390": {
-      "code": 390,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Item Not Available"
-    },
-    "391": {
-      "code": 391,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Requested Online by Customer"
-    },
-    "392": {
-      "code": 392,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Approved Online by Customer"
-    },
-    "393": {
-      "code": 393,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Customer Request"
-    },
-    "394": {
-      "code": 394,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Order Canceled"
-    },
-    "395": {
-      "code": 395,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Order Correction"
-    },
-    "396": {
-      "code": 396,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Testing"
-    },
-    "397": {
-      "code": 397,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Fraud"
-    },
-    "398": {
-      "code": 398,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Payment Failure"
-    },
-    "399": {
-      "code": 399,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Rejected RX"
-    },
-    "400": {
-      "code": 400,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "E4F Fraud/Declined"
-    },
-    "410": {
-      "code": 410,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "420": {
-      "code": 420,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "421": {
-      "code": 421,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "422": {
-      "code": 422,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "423": {
-      "code": 423,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "424": {
-      "code": 424,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "425": {
-      "code": 425,
-      "bucket": "Canceled",
-      "category": "frames",
-      "description": "Frames (RX): Vendor to Lab: Order Canceled"
-    },
-    "426": {
-      "code": 426,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "430": {
-      "code": 430,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "431": {
-      "code": 431,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "433": {
-      "code": 433,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "434": {
-      "code": 434,
-      "bucket": "Canceled",
-      "category": "frames",
-      "description": "Frames (Non-RX): Drop Ship: Order Canceled"
-    },
-    "435": {
-      "code": 435,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "436": {
-      "code": 436,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "460": {
-      "code": 460,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "463": {
-      "code": 463,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "464": {
-      "code": 464,
-      "bucket": "Canceled",
-      "category": "contacts",
-      "description": "Contacts: Drop Ship: Order Canceled"
-    },
-    "465": {
-      "code": 465,
-      "bucket": "Awaiting Restock",
-      "category": "contacts",
-      "description": ""
-    },
-    "468": {
-      "code": 468,
-      "bucket": "Awaiting Restock",
-      "category": "item",
-      "description": ""
-    },
-    "470": {
-      "code": 470,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "471": {
-      "code": 471,
-      "bucket": "Shipped",
-      "category": "item",
-      "description": ""
-    },
-    "473": {
-      "code": 473,
-      "bucket": "Shipped",
-      "category": "item",
-      "description": ""
-    },
-    "480": {
-      "code": 480,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "481": {
-      "code": 481,
-      "bucket": "Processing at Lab",
-      "category": "frames",
-      "description": ""
-    },
-    "500": {
-      "code": 500,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "515": {
-      "code": 515,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "550": {
-      "code": 550,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "551": {
-      "code": 551,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "553": {
-      "code": 553,
-      "bucket": "Shipped",
-      "category": "item",
-      "description": ""
-    },
-    "600": {
-      "code": 600,
-      "bucket": "Processing",
-      "category": "item",
-      "description": ""
-    },
-    "700": {
-      "code": 700,
-      "bucket": "Pending Verification",
-      "category": "contacts",
-      "description": ""
-    },
-    "701": {
-      "code": 701,
-      "bucket": "Pending Verification",
-      "category": "contacts",
-      "description": ""
-    },
-    "702": {
-      "code": 702,
-      "bucket": "Verification Approved",
-      "category": "contacts",
-      "description": ""
-    },
-    "703": {
-      "code": 703,
-      "bucket": "Pending Verification",
-      "category": "contacts",
-      "description": ""
-    },
-    "704": {
-      "code": 704,
-      "bucket": "Awaiting Restock",
-      "category": "contacts",
-      "description": ""
-    },
-    "710": {
-      "code": 710,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "711": {
-      "code": 711,
-      "bucket": "Verification Approved",
-      "category": "contacts",
-      "description": ""
-    },
-    "712": {
-      "code": 712,
-      "bucket": "Pending Verification",
-      "category": "contacts",
-      "description": ""
-    },
-    "713": {
-      "code": 713,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "714": {
-      "code": 714,
-      "bucket": "Awaiting Restock",
-      "category": "contacts",
-      "description": ""
-    },
-    "800": {
-      "code": 800,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "801": {
-      "code": 801,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "802": {
-      "code": 802,
-      "bucket": "Processing",
-      "category": "frames",
-      "description": ""
-    },
-    "803": {
-      "code": 803,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "804": {
-      "code": 804,
-      "bucket": "Awaiting Restock",
-      "category": "frames",
-      "description": ""
-    },
-    "950": {
-      "code": 950,
-      "bucket": "Returned",
-      "category": "item",
-      "description": ""
-    },
-    "951": {
-      "code": 951,
-      "bucket": "Returned",
-      "category": "item",
-      "description": ""
-    },
-    "952": {
-      "code": 952,
-      "bucket": "Returned",
-      "category": "item",
-      "description": ""
-    },
-    "960": {
-      "code": 960,
-      "bucket": "Exchanged",
-      "category": "item",
-      "description": ""
-    },
-    "961": {
-      "code": 961,
-      "bucket": "Exchanged",
-      "category": "item",
-      "description": ""
-    },
-    "962": {
-      "code": 962,
-      "bucket": "Exchanged",
-      "category": "item",
-      "description": ""
-    },
-    "1101": {
-      "code": 1101,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "1102": {
-      "code": 1102,
-      "bucket": "Awaiting Restock",
-      "category": "contacts",
-      "description": ""
-    },
-    "1103": {
-      "code": 1103,
-      "bucket": "Processing",
-      "category": "contacts",
-      "description": ""
-    },
-    "1104": {
-      "code": 1104,
-      "bucket": "Awaiting Restock",
-      "category": "contacts",
-      "description": ""
-    },
-    "1110": {
-      "code": 1110,
-      "bucket": "Canceled",
-      "category": "item",
-      "description": "Canceled via Odoo by Purchase User"
-    }
+    "240": { "code": 240, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "241": { "code": 241, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "242": { "code": 242, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "244": { "code": 244, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "245": { "code": 245, "bucket": "Verification Approved", "category": "item", "description": "" },
+    "246": { "code": 246, "bucket": "Awaiting Restock", "category": "item", "description": "" },
+    "250": { "code": 250, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "252": { "code": 252, "bucket": "Verification Approved", "category": "item", "description": "" },
+    "254": { "code": 254, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "255": { "code": 255, "bucket": "Awaiting Restock", "category": "item", "description": "" },
+    "260": { "code": 260, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "261": { "code": 261, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "262": { "code": 262, "bucket": "Verification Approved", "category": "item", "description": "" },
+    "264": { "code": 264, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "265": { "code": 265, "bucket": "Awaiting Restock", "category": "item", "description": "" },
+    "266": { "code": 266, "bucket": "Pending Verification", "category": "item", "description": "" },
+    "270": { "code": 270, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "272": { "code": 272, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "273": { "code": 273, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "274": { "code": 274, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "276": { "code": 276, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "278": { "code": 278, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "280": { "code": 280, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "282": { "code": 282, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "295": { "code": 295, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "297": { "code": 297, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "299": { "code": 299, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "312": { "code": 312, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "313": { "code": 313, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "320": { "code": 320, "bucket": "Processing at Lab", "category": "item", "description": "" },
+    "380": { "code": 380, "bucket": "Processing at Lab", "category": "frames", "description": "" },
+    "390": { "code": 390, "bucket": "Canceled", "category": "item", "description": "Item Not Available" },
+    "391": { "code": 391, "bucket": "Canceled", "category": "item", "description": "Requested Online by Customer" },
+    "392": { "code": 392, "bucket": "Canceled", "category": "item", "description": "Approved Online by Customer" },
+    "393": { "code": 393, "bucket": "Canceled", "category": "item", "description": "Customer Request" },
+    "394": { "code": 394, "bucket": "Canceled", "category": "item", "description": "Order Canceled" },
+    "395": { "code": 395, "bucket": "Canceled", "category": "item", "description": "Order Correction" },
+    "396": { "code": 396, "bucket": "Canceled", "category": "item", "description": "Testing" },
+    "397": { "code": 397, "bucket": "Canceled", "category": "item", "description": "Fraud" },
+    "398": { "code": 398, "bucket": "Canceled", "category": "item", "description": "Payment Failure" },
+    "399": { "code": 399, "bucket": "Canceled", "category": "item", "description": "Rejected RX" },
+    "400": { "code": 400, "bucket": "Canceled", "category": "item", "description": "E4F Fraud/Declined" },
+    "410": { "code": 410, "bucket": "Processing", "category": "item", "description": "" },
+    "420": { "code": 420, "bucket": "Processing", "category": "frames", "description": "" },
+    "421": { "code": 421, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "422": { "code": 422, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "423": { "code": 423, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "424": { "code": 424, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "425": { "code": 425, "bucket": "Canceled", "category": "frames", "description": "Frames (RX): Vendor to Lab: Order Canceled" },
+    "426": { "code": 426, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "430": { "code": 430, "bucket": "Processing", "category": "frames", "description": "" },
+    "431": { "code": 431, "bucket": "Processing", "category": "frames", "description": "" },
+    "433": { "code": 433, "bucket": "Processing", "category": "frames", "description": "" },
+    "434": { "code": 434, "bucket": "Canceled", "category": "frames", "description": "Frames (Non-RX): Drop Ship: Order Canceled" },
+    "435": { "code": 435, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "436": { "code": 436, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "460": { "code": 460, "bucket": "Processing", "category": "contacts", "description": "" },
+    "463": { "code": 463, "bucket": "Processing", "category": "contacts", "description": "" },
+    "464": { "code": 464, "bucket": "Canceled", "category": "contacts", "description": "Contacts: Drop Ship: Order Canceled" },
+    "465": { "code": 465, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
+    "468": { "code": 468, "bucket": "Awaiting Restock", "category": "item", "description": "" },
+    "470": { "code": 470, "bucket": "Processing", "category": "item", "description": "" },
+    "471": { "code": 471, "bucket": "Shipped", "category": "item", "description": "" },
+    "473": { "code": 473, "bucket": "Shipped", "category": "item", "description": "" },
+    "480": { "code": 480, "bucket": "Processing", "category": "frames", "description": "" },
+    "481": { "code": 481, "bucket": "Processing at Lab", "category": "frames", "description": "" },
+    "500": { "code": 500, "bucket": "Processing", "category": "item", "description": "" },
+    "515": { "code": 515, "bucket": "Processing", "category": "item", "description": "" },
+    "550": { "code": 550, "bucket": "Processing", "category": "item", "description": "" },
+    "551": { "code": 551, "bucket": "Processing", "category": "item", "description": "" },
+    "553": { "code": 553, "bucket": "Shipped", "category": "item", "description": "" },
+    "600": { "code": 600, "bucket": "Processing", "category": "item", "description": "" },
+    "700": { "code": 700, "bucket": "Pending Verification", "category": "contacts", "description": "" },
+    "701": { "code": 701, "bucket": "Pending Verification", "category": "contacts", "description": "" },
+    "702": { "code": 702, "bucket": "Verification Approved", "category": "contacts", "description": "" },
+    "703": { "code": 703, "bucket": "Pending Verification", "category": "contacts", "description": "" },
+    "704": { "code": 704, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
+    "710": { "code": 710, "bucket": "Processing", "category": "contacts", "description": "" },
+    "711": { "code": 711, "bucket": "Verification Approved", "category": "contacts", "description": "" },
+    "712": { "code": 712, "bucket": "Pending Verification", "category": "contacts", "description": "" },
+    "713": { "code": 713, "bucket": "Processing", "category": "contacts", "description": "" },
+    "714": { "code": 714, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
+    "800": { "code": 800, "bucket": "Processing", "category": "frames", "description": "" },
+    "801": { "code": 801, "bucket": "Processing", "category": "frames", "description": "" },
+    "802": { "code": 802, "bucket": "Processing", "category": "frames", "description": "" },
+    "803": { "code": 803, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "804": { "code": 804, "bucket": "Awaiting Restock", "category": "frames", "description": "" },
+    "950": { "code": 950, "bucket": "Returned", "category": "item", "description": "" },
+    "951": { "code": 951, "bucket": "Returned", "category": "item", "description": "" },
+    "952": { "code": 952, "bucket": "Returned", "category": "item", "description": "" },
+    "960": { "code": 960, "bucket": "Exchanged", "category": "item", "description": "" },
+    "961": { "code": 961, "bucket": "Exchanged", "category": "item", "description": "" },
+    "962": { "code": 962, "bucket": "Exchanged", "category": "item", "description": "" },
+    "1101": { "code": 1101, "bucket": "Processing", "category": "contacts", "description": "" },
+    "1102": { "code": 1102, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
+    "1103": { "code": 1103, "bucket": "Processing", "category": "contacts", "description": "" },
+    "1104": { "code": 1104, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
+    "1110": { "code": 1110, "bucket": "Canceled", "category": "item", "description": "Canceled via Odoo by Purchase User" }
   }
 }
