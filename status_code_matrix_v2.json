@@ -240,25 +240,14 @@
       },
       "rules": [
         {
-          "when": {
-            "code": 470,
-            "category": "frames"
-          },
-          "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be complete."
-        },
-        {
-          "when": {
-            "code": 470,
-            "is_rx": true
-          },
-          "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be completed."
-        },
-        {
-          "when": {
-            "code": 470
-          },
-          "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information."
-        },
+          { "when": { "code": 470, "category": "frames" },   "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be complete." },
+
+      // Si quieres mantener la condición is_rx, que sea *solo* para frames:
+      { "when": { "code": 470, "category": "frames", "is_rx": true }, "response": "Your order is being transferred to our lab for processing. Please allow 1–5 business days for your prescription lenses to be completed." },
+
+      { "when": { "code": 470, "category": "contacts" }, "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information." },
+      { "when": { "code": 470 },                         "response": "Your order is being fulfilled at our warehouse. As soon as it ships we will send you the tracking information." },
+
         {
           "when": {
             "code": 420
