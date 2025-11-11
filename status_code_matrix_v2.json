@@ -1,5 +1,5 @@
 {
-  "version": "2.2",
+  "version": "2.3",
   "updated_at": "2025-10-30T00:00:00Z",
   "template_syntax": "simple_if_blocks",
   "category_noun_map": {
@@ -287,7 +287,7 @@
     "464": { "code": 464, "bucket": "Canceled", "category": "contacts", "description": "Contacts: Drop Ship: Order Canceled" },
     "465": { "code": 465, "bucket": "Awaiting Restock", "category": "contacts", "description": "" },
     "468": { "code": 468, "bucket": "Awaiting Restock", "category": "item", "description": "" },
-    "470": { "code": , "bucket": "Processing", "category": "item", "description": "" },
+    "470": { "code": 470, "bucket": "Processing", "category": "item", "description": "Warehouse Shipping: Pick Generated" }
     "471": { "code": 471, "bucket": "Shipped", "category": "item", "description": "" },
     "473": { "code": 473, "bucket": "Shipped", "category": "item", "description": "" },
     "480": { "code": 480, "bucket": "Processing", "category": "frames", "description": "" },
